@@ -175,4 +175,239 @@ data(lr_phone) = cast zcl_boxed_struct( lr_box->resolve_path( 'phone' ) ).
 lr_phone->set_attribute( name = 'number' value = 1234 ). "... Set the attribute
 ```
 ###Usage - Table Types
-Table types can be boxed and obviously that means interacting with them will require some special functionality. The boxed type that is created when working with table types is zcl_boxed_tableset. Working with these objects mean that there are some relative limitations imposed by the framework. For example it is easy natively to work with ABAP table types whereas you need to work through the provided objects such as the  zif_boxed_iterator to iterate over a collection of boxed data. Of course the underlying representation of the contents of the boxed tableset is a generic table, which means that key access is preferred, in fact... index access is not provided out of the box for ABAP dynamic tables. It is provided by the framework, however, but it must be understood that indexed retrievals are not as efficient as key retrievals and in some cases where a hashed or sorted table has been boxed an index retrieval could return quite a confusing result.
+Table types can be boxed and obviously that means interacting with them will require some special functionality. The boxed type that is created when working with table types is **zcl_boxed_tableset**. Working with these objects mean that there are some relative limitations imposed by the framework. For example it is easy natively to work with ABAP table types whereas you need to work through the provided objects such as the  **zif_boxed_iterator** to iterate over a collection of boxed data. Of course the underlying representation of the contents of the boxed tableset is a generic table, which means that key access is preferred, in fact... index access is not provided out of the box for ABAP dynamic tables. It is provided by the framework, however, but it must be understood that indexed retrievals are not as efficient as key retrievals and in some cases where a hashed or sorted table has been boxed an index retrieval could return quite a confusing result.
+
+We will continue to use the structure provided in the above structure examples in order to show the boxing of tables. The below example has a table which is already loaded with addresses.
+```abap
+data: ls_address type address_line,
+      lt_addresses type standard table of address_line, "... Table of addresses
+      lr_table type ref to zcl_boxed_tableset. "... Tableset here
+
+"... Create some addresses (without phones)
+ls_address-number = 11.
+ls_address-street = 'Awesome Street'.
+ls_address-state = 'SA'.
+ls_address-postcode = '5000'.
+append ls_address to lt_addresses.
+
+ls_address-number = 22.
+ls_address-street = 'New Thing Street'.
+ls_address-state = 'NSW'.
+ls_address-postcode = '1201'.
+append ls_address to lt_addresses.
+
+ls_address-number = 33.
+ls_address-street = 'Other  Street'.
+ls_address-state = 'ACT'.
+ls_address-postcode = '2600'.
+append ls_address to lt_addresses.
+```
+The boxed tableset objects are created the same way the structures were created in the previous section, either using the tableset object constructor or by using the **zcl_boxed_packer object**
+```abap
+lr_table = new #( lt_addresses ). "... Create object
+lr_table ?= zcl_boxed_packer=>box( lt_addresses ). "... Use the packer (and cast)
+```
+Looping on a table requires the use of the iterator and its various functions
+```abap
+lr_table = new #( lt_addresses ). "... Create object
+
+data(lr_iterator) = lr_table->iterator( ). "... Always creates a new iterator
+
+while lr_iterator->has_next( ) eq abap_true.
+  data(lr_line) = cast zcl_boxed_struct( lr_iterator->next( ) ). "... Requires cast
+
+  write lr_line->get_attribute( 'street' )->to_string( ). new-line.
+endwhile.
+```
+_**Note:** a cast is required because the next() method returns a boxed data object not a boxed structure. Of course the contents of the table does not have to be structures as line types, so the generic result is required_
+
+An alternative is the use of the **find()** method which will find and return the first matching result. The condition must be a valid ABAP dynamic table condition, however, the ```|``` symbols may be used in place of the ```'``` symbol as it would need to be escaped (though you can use it if you wish).
+```abap
+data: lr_struct type ref to zcl_boxed_struct. "... Declare structure
+lr_struct ?= lr_table->find( 'state eq |NSW|' ). "... Find the address in NSW
+```
+If more than one result is expected, the **find_all()** method can be used. It will return a **zcl_boxed_tableset** object.
+```abap
+data: lr_result type ref to zcl_boxed_tableset. "... The results
+lr_result ?= lr_table->find_all( 'postcode cp |*00|' ). "... Find postcodes ending in 00
+
+data(lv_str) = lr_result->to_string( ).
+"> ...
+"> number:11 
+"> street:Awesome Street
+"> state:SA
+"> postcode:5000
+"> phone:number:0 
+"> area:
+">  
+"> number:33 
+"> street:Other  Street
+"> state:ACT
+"> postcode:2600
+"> phone:number:0 
+"> area:
+```
+Of course we may need to delete entries from our table, the **remove()** method perform this function. The underlying line type is used for the deletion, you can pass the value itself or a boxed data object.
+```abap
+ls_address-number = 33.
+ls_address-street = 'Other  Street'.
+ls_address-state = 'ACT'.
+ls_address-postcode = '2600'.
+append ls_address to lt_addresses.
+
+lr_table = new #( lt_addresses ). "... Create object
+
+lr_table->remove( ls_address ). "... The last address is removed
+lr_table->remove( lr_table->find( 'state = |SA|' ) ). ".. The first address is removed here
+```
+It would be relatively uninteresting if we couldnt find an item by index, so the following example removes index 2.
+```abap
+lr_table = new #( lt_addresses ). "... Create object
+
+lr_table->remove( lr_table->find( '[2]' ) ). "... Remove index 2
+```
+It is possible to **insert()** a boxed data object to a tableset. The following example inserts the structure value, note that currently it either appends or inserts depending on the table type, ie hashed, sorted or standard table.
+```abap
+lr_table = new #( lt_addresses ). "... Create object with empty table
+
+"... Create some addresses (without phones)
+ls_address-number = 11.
+ls_address-street = 'Awesome Street'.
+ls_address-state = 'SA'.
+ls_address-postcode = '5000'.
+
+lr_table->insert( ls_address ). "... Insert the address structure
+```
+A boxed structure can be inserted with the **insert()** method, the following example is identical to the above except that it boxes the structure then inserts it. 
+```abap
+"... Create some addresses (without phones)
+ls_address-number = 11.
+ls_address-street = 'Awesome Street'.
+ls_address-state = 'SA'.
+ls_address-postcode = '5000'.
+
+lr_table->insert( zcl_boxed_packer=>box( ls_address ) ). "... Insert the boxed address structure
+```
+Considering the examples provided, it is evident that there is a requirement to be able to get the line type of a table. The **get_line()** method will return an empty boxed data object that can be used. The below example does this, it requires a cast once again as the line type can be any type in a tableset.
+```abap
+data: lr_address type ref to zcl_boxed_struct, "... Now this is the structure
+      lr_table type ref to zcl_boxed_tableset, "... Tableset for the addresses
+      lt_addresses type standard table of address_line. "... Table type
+
+lr_table = new #( lt_addresses ). "... Create object with empty table
+
+lr_address ?= lr_table->get_line( ). "... Get the line out
+
+lr_address->set_attribute( name = 'number' value = 11 ). "... Set the number
+lr_address->set_attribute( name = 'street' value = 'Awesome Street' ).
+lr_address->get_attribute( 'state' )->set_value( 'SA' ). "... This is equivalent to above!
+lr_address->set_attribute( name = 'postcode' value = '5000' ).
+
+lr_table->insert( lr_address ). "... Insert the address
+```
+Finally, in the event that the table needs to be cleared, the method **clear()** is provided.
+```abap
+lr_table->clear( ). "... Clears the values
+```
+###Usage - Path Resolution
+In order to provide even greater access to complex types, and even to be able to generically access dynamic attributes within complex types like structures, the Box Path object and relative syntax was created. Using the **resolve_path()** method, as seen previously, attributes can be accessed from deeply nested structures, tables and in some cases attributes can be retrieved using the wildcard ```'*-'``` prefix.
+
+For the purposes of the discussion the following structure will be used.
+```abap
+types:
+  begin of phone_line,
+    number type n length 7,
+    area type string,
+  end of phone_line,
+  phone_tab type standard table of phone_line with default key,
+  begin of address_line,
+    number type i,
+    street type string,
+    state type char3,
+    postcode type string,
+    phone type phone_tab, "... Now this is a table
+  end of address_line,
+  begin of customer,
+    first_name type string,
+    last_name type string,
+    age type i,
+    primary_address type address_line,
+  end of customer.
+```
+The structure is then populated in the following code.
+```abap
+data: ls_phone type phone_line,
+      ls_customer type customer.
+
+"... Setup the customer structure
+ls_customer-first_name = 'Bill'.
+ls_customer-last_name = 'Smith'.
+ls_customer-age = 30.
+ls_customer-primary_address-number = 62.
+ls_customer-primary_address-postcode = '5000'.
+ls_customer-primary_address-state = 'SA'.
+ls_customer-primary_address-street = 'Awesome Street'.
+
+ls_phone-area = '08'.
+ls_phone-number = 8432345.
+append ls_phone to ls_customer-primary_address-phone.
+
+ls_phone-area = '08'.
+ls_phone-number = 8464324.
+append ls_phone to ls_customer-primary_address-phone.
+
+ls_phone-area = '042'.
+ls_phone-number = 6423423.
+append ls_phone to ls_customer-primary_address-phone.
+```
+Data can be retrieved using the **resolve_path()** statement from nested structures. The same syntax is provided as would be seen when accessing the data in ABAP. 
+```abap
+data(lr_box) = zcl_boxed_packer=>box( ls_customer ). "... Box the structure
+
+data(lr_state) = lr_box->resolve_path( 'primary_address-state' ). "... Get the state
+```
+Dynamic where conditions can be added to find data that is within tables. Note that the first match is returned and the search for the relevant attributes occurs via a breadth first search.
+```abap
+data(lr_box) = zcl_boxed_packer=>box( ls_customer ). "... Box the structure
+
+"... Get the phone number of the first phone entry
+data(lr_num) = lr_box->resolve_path( 'primary_address-phone[1]-number' ).
+```
+It is also possible to do a wildcard search by using the ```*-``` prefix, note that if a table is empty this would not return a value. If the result is not found the result **will be not bound**.
+```abap
+data(lr_box) = zcl_boxed_packer=>box( ls_customer ). "... Box the structure
+
+"... Get the first field called 'number'
+data(lr_num) = lr_box->resolve_path( '*-number' ).
+
+write lr_num->to_string( ).
+"> ...
+"> 62
+```
+Note that the above returns the first street number! this is because during the BFS the first field found is the 'number' in the address_line structure. It is important to understand this distinction. To resolve, demonstrating the wildcard further, the path could be extended to apply a more specific relation.
+```abap
+data(lr_box) = zcl_boxed_packer=>box( ls_customer ). "... Box the structure
+
+"... Get the first phone entry's number
+data(lr_num) = lr_box->resolve_path( '*-phone[1]-number' ).
+
+write lr_num->to_string( ).
+"> ...
+"> 8432345
+```
+The following is a final example.
+```abap
+data(lr_box) = zcl_boxed_packer=>box( ls_customer ). "... Box the structure
+
+"... Get the first phone number where the area is '042'
+data(lr_num) = lr_box->resolve_path( '*-phone[area eq |042|]-number' ).
+
+write lr_num->to_string( ).
+"> ...
+"> 6423423
+```
+###Usage - Mappings and Bindings*
+Mappings are currently implemented. Unfortunately I have no examples here to provide. Bindings were an upcomming feature that likely will not ever be complete.
+
+###Final Notes
+To install there is a .nugg file. I wont explain how to use that sorry. Yes there is a performance hit using these objects mostly due to the retrieval of the type descriptors which would be neccessary regardless. There is essentially no performance cost than doing all of the features yourself dynamically so if you are using dynamic program i can recommend you use this framework. However, the framework is definitely slower than natively using abap types so you should take this into consideration.
