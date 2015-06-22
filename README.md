@@ -55,7 +55,7 @@ data: lv_str type string value 'This is not changed'.
 data(lr_str) = zcl_boxed_packer=>box( lv_str ).
 lr_str->set_value( 'but this is a new value' ).
 ```
-Printing the values shows the output, note that the boxed data objects have a 'to_string()' method, although some output is a little more useful than others
+Printing the values shows the output, note that the boxed data objects have a **to_string()** method, although some output is a little more useful than others
 ```abap
 write lv_str. new-line.
 write lr_str->to_string( ).
