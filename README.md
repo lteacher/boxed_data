@@ -3,7 +3,7 @@
 
 The 'Boxed Data Framework' is a set of ABAP objects which are designed to abstract and provide usability for commonly used dynamic programming scenarios in ABAP. The framework provides a number of useful capabilities that can assist with manipulating ABAP types in a generic fashion. This document will provide a very short introduction and then immediately describe the usage.
 
-###Introduction
+### Introduction
 There are a couple of key scenarios where the framework comes in handy. To start, lets imagine the case where we want to have a structure which is stored as an object. This is a relatively common case, the structure itself is abstracted away in the object and it has 'set_attribute(name,value)' or 'get_attribute(name):value' methods. This might then form the base of another set of objects which use this object to store the data internally. Of course the underlying structure can differ per object but the access is always the same through the provided methods. I had a nice image here in a past document but as I dont have that now let me try and illustrate with an **imaginary** ABAP like language.
 ```abap
 class Object
@@ -26,7 +26,7 @@ BoxedData ~ the base abstract boxed type
 BoxPath ~ path for accessing complex data
 BoxedPacker ~ packs boxed types using the box() method
 ```
-###Usage - Elements / Basics
+### Usage - Elements / Basics
 The following section will just work through the usages of each boxed type. Basic elements such as strings etc will be boxed into a type of **zcl_boxed_element**.
 
 A boxed type can be constructed as a normal object(note the use of # is abap 7.4)
@@ -100,7 +100,7 @@ lr_str->get_value( importing value = lv_str ). "... The types must match!
 lr_data = lr_str->get_data( ). "... A data ref can be pulled out
 *lr_str->get_value( importing value = lv_int ). "... This will fail! (the int cant be passed here!)
 ```
-###Usage - Structures
+### Usage - Structures
 The boxed class for working with structures is **zcl_boxed_struct**. This class is a subclass of the boxed data base class and contains all the above functionality, however, it also has some more methods specific to structures. 
 
 For the purpose of this section the following will be the example structure. It is an address structure with a phone structure inside that.
@@ -174,7 +174,7 @@ As seen, the *resolve_path()* method can provide access to the attributes, howev
 data(lr_phone) = cast zcl_boxed_struct( lr_box->resolve_path( 'phone' ) ).
 lr_phone->set_attribute( name = 'number' value = 1234 ). "... Set the attribute
 ```
-###Usage - Table Types
+### Usage - Table Types
 Table types can be boxed and obviously that means interacting with them will require some special functionality. The boxed type that is created when working with table types is **zcl_boxed_tableset**. Working with these objects mean that there are some relative limitations imposed by the framework. For example it is easy natively to work with ABAP table types whereas you need to work through the provided objects such as the  **zif_boxed_iterator** to iterate over a collection of boxed data. Of course the underlying representation of the contents of the boxed tableset is a generic table, which means that key access is preferred, in fact... index access is not provided out of the box for ABAP dynamic tables. It is provided by the framework, however, but it must be understood that indexed retrievals are not as efficient as key retrievals and in some cases where a hashed or sorted table has been boxed an index retrieval could return quite a confusing result.
 
 We will continue to use the structure provided in the above structure examples in order to show the boxing of tables. The below example has a table which is already loaded with addresses.
@@ -309,7 +309,7 @@ Finally, in the event that the table needs to be cleared, the method **clear()**
 ```abap
 lr_table->clear( ). "... Clears the values
 ```
-###Usage - Path Resolution
+### Usage - Path Resolution
 In order to provide even greater access to complex types, and even to be able to generically access dynamic attributes within complex types like structures, the Box Path object and relative syntax was created. Using the **resolve_path()** method, as seen previously, attributes can be accessed from deeply nested structures, tables and in some cases attributes can be retrieved using the wildcard ```'*-'``` prefix.
 
 For the purposes of the discussion the following structure will be used.
@@ -406,8 +406,8 @@ write lr_num->to_string( ).
 "> ...
 "> 6423423
 ```
-###Usage - Mappings and Bindings*
+### Usage - Mappings and Bindings*
 Mappings are currently implemented. Unfortunately I have no examples here to provide. Bindings were an upcomming feature that likely will not ever be complete.
 
-###Final Notes
+### Final Notes
 To install there is a .nugg file. I wont explain how to use that sorry. Yes there is a performance hit using these objects mostly due to the retrieval of the type descriptors which would be neccessary regardless. There is essentially no performance cost than doing all of the features yourself dynamically so if you are using dynamic program i can recommend you use this framework. However, the framework is definitely slower than natively using abap types so you should take this into consideration.
